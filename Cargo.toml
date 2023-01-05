@@ -1,0 +1,6 @@
+[workspace]
+
+members = [
+    "ee_tools_plus",
+    "bin_converter",
+]
