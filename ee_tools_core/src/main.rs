@@ -1,5 +1,6 @@
-use clap::Parser;
 use bin_converter::ImageConverter;
+use clap::Parser;
+use header_syncer::Syncer;
 
 /// EE_TOOLS
 #[derive(Parser)]
@@ -11,19 +12,40 @@ struct Args {
 
 #[derive(clap::Subcommand)]
 enum Action {
-    /// A synchronous C header file program
-    CHeaderSync {
-        /// Set the source file and output file
-        #[arg(short, default_value_t = String::new())]
-        set: String,
+    /// A synchronous header file program
+    HeaderSyncer {
+        // /// Set the source file and output file
+        // #[arg(short, default_value_t = String::new())]
+        // set: String,
 
-        /// This option is used to specify an initialization script file.
+        // /// This option is used to specify an initialization script file.
+        // #[arg(long, default_value_t = String::new())]
+        // init: String,
+
+        // /// Quiet
+        // #[arg(short, default_value_t = false)]
+        // quiet: bool,
+        /// From files; e.g., `--from "api1.h api2.h"`
+        #[arg(long)]
+        from: String,
+
+        /// To files; e.g., `--to "api.h test.h"`
+        #[arg(long)]
+        to: String,
+
+        /// Sync label; e.g., `--sync-lable "/* header-sync */"`,
+        /// then it will copy from '/* header-sync start */' to '/* header-sync end */'
+        #[arg(long)]
+        sync_lable: String,
+
+        /// Class name; e.g., `--class-name "test"`,
+        /// then it will add `// test` to the start of the sync code
         #[arg(long, default_value_t = String::new())]
-        init: String,
+        class_name: String,
 
-        /// Quiet
-        #[arg(short, default_value_t = false)]
-        quiet: bool,
+        /// Ignore symbol; e.g., `--ignore-symbol "sym1 sym2"`
+        #[arg(long, default_value_t = String::new())]
+        ignore_symbol: String,
     },
 
     /// Binary format convertor
@@ -61,6 +83,25 @@ fn main() {
     let args = Args::parse();
 
     match args.action {
+        Action::HeaderSyncer {
+            // set,
+            // init,
+            // quiet,
+            from,
+            to,
+            sync_lable,
+            class_name,
+            ignore_symbol,
+        } => {
+            let from = from.split(' ').collect();
+            let to = to.split(' ').collect();
+            let isyms = ignore_symbol.split(' ').collect();
+            let mut syncer = Syncer::new(from, to, &sync_lable);
+            syncer.set_class_name(&class_name);
+            syncer.set_ignore_symbols(isyms);
+            // syncer.set_mark_symbols(mark)
+            syncer.run();
+        }
         Action::BinConverter {
             init,
             from,
@@ -87,7 +128,7 @@ fn main() {
                     Ok(w) => w,
                     Err(_) => panic!("Need to specify the width of the image!"),
                 };
-                
+
                 let height = height.parse::<u32>();
                 h = match height {
                     Ok(h) => h,
@@ -101,7 +142,7 @@ fn main() {
                 //     width: w as usize,
                 //     height: h as usize,
                 // };
-                
+
                 println!("width: {:?} height: {:?}", w, h);
             }
 
@@ -111,6 +152,5 @@ fn main() {
             // let out = out.to_owned() + ".png";
             // println!("w={} h={} file={} out={}", width, height, file, out);
         }
-        _ => {}
     }
 }
