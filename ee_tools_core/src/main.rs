@@ -1,6 +1,6 @@
-use bin_converter::ImageConverter;
+// use bin_converter::ImageConverter;
 use clap::Parser;
-use header_syncer::Syncer;
+use header_syncer::*;
 
 /// EE_TOOLS
 #[derive(Parser)]
@@ -25,6 +25,7 @@ enum Action {
         // /// Quiet
         // #[arg(short, default_value_t = false)]
         // quiet: bool,
+
         /// From files; e.g., `--from "api1.h api2.h"`
         #[arg(long)]
         from: String,
@@ -32,6 +33,10 @@ enum Action {
         /// To files; e.g., `--to "api.h test.h"`
         #[arg(long)]
         to: String,
+
+        /// Type of From files; e.g., `--type_of_from "gnu_lds"
+        #[arg(long, default_value_t = String::new())]
+        type_of_from: String,
 
         /// Sync label; e.g., `--sync-lable "/* header-sync */"`,
         /// then it will copy from '/* header-sync start */' to '/* header-sync end */'
@@ -46,6 +51,10 @@ enum Action {
         /// Ignore symbol; e.g., `--ignore-symbol "sym1 sym2"`
         #[arg(long, default_value_t = String::new())]
         ignore_symbol: String,
+
+        /// Symbol compression mode; e.g., `--comp
+        #[arg(short, long, default_value_t = true)]
+        compress: bool,
     },
 
     /// Binary format convertor
@@ -89,28 +98,36 @@ fn main() {
             // quiet,
             from,
             to,
+            type_of_from,
             sync_lable,
             class_name,
             ignore_symbol,
+            compress,
         } => {
             let from = from.split(' ').collect();
             let to = to.split(' ').collect();
             let isyms = ignore_symbol.split(' ').collect();
             let mut syncer = Syncer::new(from, to, &sync_lable);
+
+            if type_of_from == "gnu_lds" {
+                syncer.set_type_of_form(FromFileType::GnuLinkScript);
+            }
+
             syncer.set_class_name(&class_name);
             syncer.set_ignore_symbols(isyms);
             // syncer.set_mark_symbols(mark)
+            syncer.set_compress(compress);
             syncer.run();
         }
         Action::BinConverter {
-            init,
+            init: _,
             from,
             to,
             width,
             height,
-            rgb_type,
-            has_alpha,
-            out_format,
+            rgb_type: _,
+            has_alpha: _,
+            out_format: _,
         } => {
             let w: u32;
             let h: u32;

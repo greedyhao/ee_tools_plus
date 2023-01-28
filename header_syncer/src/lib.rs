@@ -9,13 +9,20 @@ use std::{
 // use lang_c::driver::{Config, parse};
 use rand::prelude::*;
 
+pub enum FromFileType {
+    Header,
+    GnuLinkScript,
+}
+
 pub struct Syncer {
     from: Vec<String>,
     to: Vec<String>,
+    type_of_from: FromFileType,
     lable: String,
     class_name: String,
     ignore_symbols: Vec<String>,
     mark_symbols: Vec<String>,
+    compress: bool,
 }
 
 #[derive(Debug)]
@@ -30,11 +37,17 @@ impl Syncer {
         Syncer {
             from: from.iter().map(|s| s.to_string()).collect(),
             to: to.iter().map(|s| s.to_string()).collect(),
+            type_of_from: FromFileType::Header,
             lable: lable.to_string(),
             class_name: String::new(),
             ignore_symbols: Vec::new(),
             mark_symbols: Vec::new(),
+            compress: true,
         }
+    }
+
+    pub fn set_type_of_form(&mut self, type_of_from: FromFileType) {
+        self.type_of_from = type_of_from;
     }
 
     pub fn set_class_name(&mut self, name: &str) {
@@ -47,6 +60,10 @@ impl Syncer {
     
     pub fn set_mark_symbols(&mut self, mark: Vec<&str>) {
         self.mark_symbols = mark.iter().map(|s| s.to_string()).collect();
+    }
+
+    pub fn set_compress(&mut self, compress: bool) {
+        self.compress = compress;
     }
 
     pub fn run(&mut self) {
@@ -77,7 +94,7 @@ impl Syncer {
             let file = File::open(f);
             
             match file {
-                Ok(file) => {
+                Ok(_file) => {
                     // self.copy_specific_content_to_another_file(&file, &mut tmp_file);
                 }
                 Err(e) => {
