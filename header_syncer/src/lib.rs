@@ -1,6 +1,7 @@
 use std::fs::OpenOptions;
 use std::io::BufRead;
 use std::io::Write;
+use std::io::{Seek, SeekFrom};
 use std::{
     fs::{self, File},
     io::BufReader,
@@ -18,7 +19,7 @@ pub struct Syncer {
     from: Vec<String>,
     to: Vec<String>,
     type_of_from: FromFileType,
-    lable: String,
+    label: String,
     class_name: String,
     ignore_symbols: Vec<String>,
     mark_symbols: Vec<String>,
@@ -33,12 +34,12 @@ enum CheckLabelRsp {
 }
 
 impl Syncer {
-    pub fn new(from: Vec<&str>, to: Vec<&str>, lable: &str) -> Syncer {
+    pub fn new(from: Vec<&str>, to: Vec<&str>, label: &str) -> Syncer {
         Syncer {
             from: from.iter().map(|s| s.to_string()).collect(),
             to: to.iter().map(|s| s.to_string()).collect(),
             type_of_from: FromFileType::Header,
-            lable: lable.to_string(),
+            label: label.to_string(),
             class_name: String::new(),
             ignore_symbols: Vec::new(),
             mark_symbols: Vec::new(),
@@ -57,7 +58,7 @@ impl Syncer {
     pub fn set_ignore_symbols(&mut self, ignore: Vec<&str>) {
         self.ignore_symbols = ignore.iter().map(|s| s.to_string()).collect();
     }
-    
+
     pub fn set_mark_symbols(&mut self, mark: Vec<&str>) {
         self.mark_symbols = mark.iter().map(|s| s.to_string()).collect();
     }
@@ -71,7 +72,7 @@ impl Syncer {
         let tmp: u32 = rng.gen();
         let tmp_name = format!("header_syncer_{}", tmp);
         // println!("{}", tmp_name);
-        let mut tmp_file = OpenOptions::new()
+        let tmp_file = OpenOptions::new()
             .write(true)
             .append(true)
             .create(true)
@@ -82,20 +83,102 @@ impl Syncer {
             let file = File::open(f);
             match file {
                 Ok(file) => {
-                    self.copy_specific_content_to_another_file(&file, &mut tmp_file);
+                    if let Some((start, end)) =
+                        self.get_label_position_in_file(&file, "start", "end")
+                    {
+                        let mut line = String::new();
+                        let mut reader = BufReader::new(&file);
+                        reader.seek(SeekFrom::Start(start as u64)).unwrap();
+
+                        loop {
+                            reader.read_line(&mut line).unwrap();
+                            if reader.stream_position().unwrap() >= end as u64 {
+                                break;
+                            }
+                            writeln!(&tmp_file, "{}", line.trim_end()).unwrap();
+                            line.clear();
+                        }
+                    }
                 }
                 Err(e) => {
                     println!("{} open failed, {}", &f, e);
                 }
             }
         }
+        drop(tmp_file);
 
         for f in &self.to {
             let file = File::open(f);
-            
+
             match file {
-                Ok(_file) => {
-                    // self.copy_specific_content_to_another_file(&file, &mut tmp_file);
+                Ok(file) => {
+                    let start_string = "autogen start";
+                    let end_string = "autogen end";
+
+                    // println!(
+                    //     "in to file {:?}",
+                    //     self.get_label_position_in_file(&file, start_string, end_string)
+                    // );
+
+                    if let Some((start, end)) =
+                        self.get_label_position_in_file(&file, start_string, end_string)
+                    {
+                        let new_file = File::create(f.to_string() + ".new").unwrap();
+                        let mut line = String::new();
+                        let mut reader = BufReader::new(&file);
+
+                        reader.rewind().unwrap();
+                        loop {
+                            reader.read_line(&mut line).unwrap();
+                            if reader.stream_position().unwrap() >= start as u64 {
+                                line.clear();
+                                break;
+                            }
+                            // println!("1 line {}", line.trim_end());
+                            writeln!(&new_file, "{}", line.trim_end()).unwrap();
+                            line.clear();
+                        }
+
+                        let mut label: Vec<&str> = self.label.split(' ').collect();
+                        let label_last = label.pop().unwrap();
+
+                        // write start label
+                        let mut slabel = label.clone();
+                        slabel.push(start_string);
+                        slabel.push(label_last);
+                        writeln!(&new_file, "{}", slabel.join(" ")).unwrap();
+
+                        // need to copy
+                        let tmp_file = File::open(&tmp_name).unwrap();
+                        let tmp_reader = BufReader::new(&tmp_file);
+
+                        for line in tmp_reader.lines() {
+                            if let Ok(line) = line {
+                                // println!("line {}", line);
+                                writeln!(&new_file, "{}", line).unwrap();
+                            }
+                        }
+
+                        // write end label
+                        label.push(end_string);
+                        label.push(label_last);
+                        writeln!(&new_file, "{}", label.join(" ")).unwrap();
+
+                        reader.seek(SeekFrom::Start(end as u64)).unwrap();
+
+                        while let Ok(size) = reader.read_line(&mut line) {
+                            if size == 0 {
+                                break;
+                            }
+
+                            // println!("2 line {}", line.trim_end());
+                            writeln!(&new_file, "{}", line.trim_end()).unwrap();
+                            line.clear();
+                        }
+
+                        fs::remove_file(f.to_string()).unwrap();
+                        fs::rename(f.to_string() + ".new", f.to_string()).unwrap();
+                    }
                 }
                 Err(e) => {
                     println!("{} open failed, {}", &f, e);
@@ -105,48 +188,75 @@ impl Syncer {
         fs::remove_file(&tmp_name).unwrap();
     }
 
-    fn copy_specific_content_to_another_file(&self, from: &File, to: &mut File) {
-        let reader = BufReader::new(from);
-        let mut need_copy = false;
+    /// Returns the position of the label in the given file
+    fn get_label_position_in_file(
+        &self,
+        file: &File,
+        start: &str,
+        end: &str,
+    ) -> Option<(usize, usize)> {
+        let mut reader = BufReader::new(file);
+        let mut line = String::new();
+        let mut res = None;
+        let mut start_pos = 0;
+        let end_pos;
 
-        for line in reader.lines() {
-            if let Ok(line) = line {
-                match self.check_label(&line, "start", "end") {
-                    CheckLabelRsp::Start => {
-                        need_copy = true;
-                        continue;
-                    }
-                    CheckLabelRsp::End => {
-                        need_copy = false;
-                    }
-                    _ => {}
-                }
+        // need to rewind the file
+        reader.rewind().unwrap();
 
-                if need_copy {
-                    // println!("copyed {}", line);
-                    writeln!(to, "{}", line).unwrap();
-                }
+        while let Ok(size) = reader.read_line(&mut line) {
+            if size == 0 {
+                break;
             }
+            line = line.trim_end().to_string();
+            match self.check_label(&line, start, end) {
+                CheckLabelRsp::Start => {
+                    start_pos = reader.stream_position().unwrap();
+                }
+                CheckLabelRsp::End => {
+                    end_pos = reader.stream_position().unwrap();
+                    res = Some((start_pos as usize, end_pos as usize));
+                    break;
+                }
+                _ => {}
+            }
+            line.clear();
         }
+
+        res
     }
 
     fn check_label(&self, line: &str, start: &str, end: &str) -> CheckLabelRsp {
-        let mut field = line.split(' ');
-        let lable: Vec<&str> = self.lable.split(' ').collect();
+        let mut label = self.label.split(' ');
         let mut need_copy = CheckLabelRsp::None;
 
-        if field.next() == Some(lable[0]) && field.next() == Some(lable[1]) {
-            let state = field.next();
-            if state == Some(start) {
+        let iter_line: Vec<&str> = line.split(' ').collect();
+        if label.all(|x| iter_line.contains(&x)) {
+            // println!(
+            //     "check if start or end, line:{:?} start:{} end:{}",
+            //     iter_line, start, end
+            // );
+            if start.split(' ').all(|x| iter_line.contains(&x)) {
                 need_copy = CheckLabelRsp::Start;
-            } else if state == Some(end) {
+            } else if end.split(' ').all(|x| iter_line.contains(&x)) {
                 need_copy = CheckLabelRsp::End;
             }
-            // mismatch
-            if field.next() != Some(lable[2]) {
-                need_copy = CheckLabelRsp::None;
-            }
         }
+
         need_copy
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::Syncer;
+
+    #[test]
+    fn test_check_update_status() {
+        let from = vec![concat!(env!("CARGO_MANIFEST_DIR"), "\\examples\\test1.h")];
+        let to = vec![concat!(env!("CARGO_MANIFEST_DIR"), "\\examples\\api.h")];
+        let mut syncer = Syncer::new(from, to, "/* header-sync */");
+
+        syncer.run();
     }
 }

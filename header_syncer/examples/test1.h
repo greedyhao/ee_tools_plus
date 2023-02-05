@@ -12,5 +12,5 @@ enum {
     TEST1_B,
 };
 /* header-sync end */
-
+// end
 #endif

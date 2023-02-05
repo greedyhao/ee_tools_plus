@@ -40,7 +40,7 @@ enum Action {
 
         /// Sync label; e.g., `--sync-lable "/* header-sync */"`,
         /// then it will copy from '/* header-sync start */' to '/* header-sync end */'
-        #[arg(long)]
+        #[arg(long, default_value_t = String::from("/* header-sync */"))]
         sync_lable: String,
 
         /// Class name; e.g., `--class-name "test"`,
