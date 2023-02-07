@@ -90,6 +90,8 @@ impl Syncer {
                         let mut reader = BufReader::new(&file);
                         reader.seek(SeekFrom::Start(start as u64)).unwrap();
 
+                        // let name = f.split("\\").last().unwrap();
+                        // writeln!(&tmp_file, "// {}", name).unwrap();
                         loop {
                             reader.read_line(&mut line).unwrap();
                             if reader.stream_position().unwrap() >= end as u64 {
@@ -101,7 +103,7 @@ impl Syncer {
                     }
                 }
                 Err(e) => {
-                    println!("{} open failed, {}", &f, e);
+                    panic!("{} open failed, {}", &f, e);
                 }
             }
         }
@@ -176,8 +178,11 @@ impl Syncer {
                             line.clear();
                         }
 
-                        fs::remove_file(f.to_string()).unwrap();
+                        drop(new_file);
+
+                        fs::rename(f.to_string(), f.to_string() + ".old").unwrap();
                         fs::rename(f.to_string() + ".new", f.to_string()).unwrap();
+                        fs::remove_file(f.to_string() + ".old").unwrap();
                     }
                 }
                 Err(e) => {
@@ -227,18 +232,22 @@ impl Syncer {
     }
 
     fn check_label(&self, line: &str, start: &str, end: &str) -> CheckLabelRsp {
-        let mut label = self.label.split(' ');
+        let label: Vec<&str> = self.label.split(' ').collect();
         let mut need_copy = CheckLabelRsp::None;
 
         let iter_line: Vec<&str> = line.split(' ').collect();
-        if label.all(|x| iter_line.contains(&x)) {
+        if label.iter().all(|x| iter_line.contains(&x)) {
             // println!(
             //     "check if start or end, line:{:?} start:{} end:{}",
             //     iter_line, start, end
             // );
-            if start.split(' ').all(|x| iter_line.contains(&x)) {
+            if start.split(' ').count() + label.len() == iter_line.len()
+                && start.split(' ').all(|x| iter_line.contains(&x))
+            {
                 need_copy = CheckLabelRsp::Start;
-            } else if end.split(' ').all(|x| iter_line.contains(&x)) {
+            } else if end.split(' ').count() + label.len() == iter_line.len()
+                && end.split(' ').all(|x| iter_line.contains(&x))
+            {
                 need_copy = CheckLabelRsp::End;
             }
         }

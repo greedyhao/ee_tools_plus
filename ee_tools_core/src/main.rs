@@ -43,16 +43,16 @@ enum Action {
         #[arg(long, default_value_t = String::from("/* header-sync */"))]
         sync_lable: String,
 
-        /// Class name; e.g., `--class-name "test"`,
+        /// TODO: Class name; e.g., `--class-name "test"`,
         /// then it will add `// test` to the start of the sync code
         #[arg(long, default_value_t = String::new())]
         class_name: String,
 
-        /// Ignore symbol; e.g., `--ignore-symbol "sym1 sym2"`
+        /// TODO: Ignore symbol; e.g., `--ignore-symbol "sym1 sym2"`
         #[arg(long, default_value_t = String::new())]
         ignore_symbol: String,
 
-        /// Symbol compression mode; e.g., `--comp
+        /// TODO: Symbol compression mode; e.g., `--comp
         #[arg(short, long, default_value_t = true)]
         compress: bool,
     },
