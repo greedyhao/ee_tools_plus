@@ -7,7 +7,7 @@ use std::{
     io::BufReader,
 };
 
-// use lang_c::driver::{Config, parse};
+// use lang_c::driver::{parse, Config};
 use rand::prelude::*;
 
 pub enum FromFileType {
@@ -259,6 +259,8 @@ impl Syncer {
 #[cfg(test)]
 mod tests {
     use crate::Syncer;
+    // use lang_c::driver::{parse, Config};
+    use std::env;
 
     #[test]
     fn test_check_update_status() {
@@ -266,6 +268,40 @@ mod tests {
         let to = vec![concat!(env!("CARGO_MANIFEST_DIR"), "\\examples\\api.h")];
         let mut syncer = Syncer::new(from, to, "/* header-sync */");
 
+        // let mut sys_path = env::var_os("path").unwrap();
+        // sys_path.push(";");
+        // sys_path.push("D:\\ProgramFiles\\Coder\\mingw64\\bin");
+        // env::set_var("path", sys_path);
+
+        // // println!("new sys_path={:?}", env::var_os("path").unwrap());
+
+        // let config = Config::default();
+        // let res = parse(
+        //     &config,
+        //     concat!(env!("CARGO_MANIFEST_DIR"), "\\examples\\test1.h"),
+        // );
+
+        // // format!("{:?}", res);
+        // match res {
+        //     Ok(res) => {
+        //         let find = "test1";
+        //         for i in 0..res.unit.0.len() {
+        //             let ast = format!("{:?}", res.unit.0[i].node);
+        //             // if ast.contains()
+        //         }
+        //         println!("res len:{}", res.unit.0.len());
+
+        //         let dec = &res.unit.0[3].node;
+        //         match dec {
+        //             lang_c::ast::ExternalDeclaration::Declaration(node) => {
+        //                 println!("declarators:{:?}\n", node.node.declarators);
+        //                 println!("specifiers:{:?}", node.node.specifiers);
+        //             }
+        //             _ => {}
+        //         }
+        //     }
+        //     Err(_) => {}
+        // };
         syncer.run();
     }
 }
