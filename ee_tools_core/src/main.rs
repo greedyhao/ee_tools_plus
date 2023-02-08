@@ -1,6 +1,7 @@
 // use bin_converter::ImageConverter;
 use clap::Parser;
 use header_syncer::*;
+use std::env;
 
 /// EE_TOOLS
 #[derive(Parser)]
@@ -25,7 +26,6 @@ enum Action {
         // /// Quiet
         // #[arg(short, default_value_t = false)]
         // quiet: bool,
-
         /// From files; e.g., `--from "api1.h api2.h"`
         #[arg(long)]
         from: String,
@@ -55,6 +55,10 @@ enum Action {
         /// TODO: Symbol compression mode; e.g., `--comp
         #[arg(short, long, default_value_t = true)]
         compress: bool,
+
+        /// Add additional path variables; e.g., `--extra_path_var path_to\gcc`
+        #[arg(long, default_value_t = String::new())]
+        extra_path_var: String,
     },
 
     /// Binary format convertor
@@ -103,11 +107,18 @@ fn main() {
             class_name,
             ignore_symbol,
             compress,
+            extra_path_var,
         } => {
             let from = from.split(' ').collect();
             let to = to.split(' ').collect();
             let isyms = ignore_symbol.split(' ').collect();
             let mut syncer = Syncer::new(from, to, &sync_lable);
+
+            // Add additional path variables
+            let mut sys_path = env::var_os("path").unwrap();
+            sys_path.push(";");
+            sys_path.push(extra_path_var);
+            env::set_var("path", sys_path);
 
             if type_of_from == "gnu_lds" {
                 syncer.set_type_of_form(FromFileType::GnuLinkScript);
