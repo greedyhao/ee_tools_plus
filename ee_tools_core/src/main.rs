@@ -1,4 +1,4 @@
-// use bin_converter::ImageConverter;
+use bin_converter::*;
 use clap::Parser;
 use header_syncer::*;
 use std::env;
@@ -61,8 +61,8 @@ enum Action {
         extra_path_var: String,
     },
 
-    /// Binary format convertor
-    BinConverter {
+    /// File format convertor
+    Converter {
         /// This option is used to specify an initialization script file.
         #[arg(long, default_value_t = String::new())]
         init: String,
@@ -75,9 +75,11 @@ enum Action {
         #[arg(long)]
         to: String,
 
+        /// Width is needed for conversion from 'txt' and binary format
         #[arg(long, default_value_t = String::new())]
         width: String,
 
+        /// Height is needed for conversion from 'txt' and binary format
         #[arg(long, default_value_t = String::new())]
         height: String,
 
@@ -87,8 +89,11 @@ enum Action {
         #[arg(long, default_value_t = false)]
         has_alpha: bool,
 
-        #[arg(long, default_value_t = String::new())]
-        out_format: String,
+        #[arg(long, default_value_t = false)]
+        has_custom_format: bool,
+
+        #[arg(long, default_value_t = 0)]
+        bits_per_sample: u8,
     },
 }
 
@@ -130,7 +135,7 @@ fn main() {
             syncer.set_compress(compress);
             syncer.run();
         }
-        Action::BinConverter {
+        Action::Converter {
             init: _,
             from,
             to,
@@ -138,41 +143,15 @@ fn main() {
             height,
             rgb_type: _,
             has_alpha: _,
-            out_format: _,
+            has_custom_format,
+            bits_per_sample,
         } => {
-            let w: u32;
-            let h: u32;
-            let mut from_s = from.split('.').collect::<Vec<&str>>();
-            let mut to_s = to.split('.').collect::<Vec<&str>>();
+            let mut converter = ImageConverter::new(from, to, has_custom_format);
+            let format = BinFileFormat { bits_per_sample };
 
-            // Prevents from[1] and to[1] being empty
-            from_s.push("");
-            to_s.push("");
-
-            println!("from: {:?} {:?}", from_s, to_s);
-            if from_s[1] == "txt" {
-                let width = width.parse::<u32>();
-                w = match width {
-                    Ok(w) => w,
-                    Err(_) => panic!("Need to specify the width of the image!"),
-                };
-
-                let height = height.parse::<u32>();
-                h = match height {
-                    Ok(h) => h,
-                    Err(_) => panic!("Need to specify the height of the image!"),
-                };
-
-                bin_converter::gen_img_from_file(&from, &to, w, h);
-                // let img_cov = ImageConverter {
-                //     from,
-                //     to,
-                //     width: w as usize,
-                //     height: h as usize,
-                // };
-
-                println!("width: {:?} height: {:?}", w, h);
-            }
+            converter.set_width_and_height(width, height);
+            converter.set_bin_file_format(format);
+            converter.run().unwrap();
 
             // let file = args.next().unwrap().split('=').next_back().unwrap();
 
