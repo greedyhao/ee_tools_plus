@@ -1,3 +1,7 @@
+use image::error::UnsupportedError;
+use image::DynamicImage;
+use image::ImageError;
+use image::ImageResult;
 use image::RgbImage;
 use std::{
     fs::File,
@@ -62,38 +66,8 @@ impl ImageConverter {
             return Err("from_format and to_format should not be undefined".to_string());
         }
 
-        match self.from_format {
-            FileFormat::TextFile => {
-                let width = self
-                    .width
-                    .parse::<u32>()
-                    .expect("Need to specify the width of the image!");
-
-                let height = self
-                    .height
-                    .parse::<u32>()
-                    .expect("Need to specify the height of the image!");
-
-                let buf = self.construct_data_from_file(&self.from);
-
-                let mut image = RgbImage::new(width, height);
-                for (i, pixel) in buf.iter().enumerate() {
-                    let r = pixel >> 11;
-                    let g = (pixel >> 5) & 0x3F;
-                    let b = pixel & 0x1F;
-
-                    let r = (r as f32 * 255.0 / 31.0 + 0.5) as u8;
-                    let g = (g as f32 * 255.0 / 63.0 + 0.5) as u8;
-                    let b = (b as f32 * 255.0 / 31.0 + 0.5) as u8;
-                    image.put_pixel(i as u32 % width, i as u32 / width, image::Rgb([r, g, b]));
-                }
-                image.save(&self.to).unwrap();
-            }
-            FileFormat::RawBinaryFile => {}
-            FileFormat::StandardBinaryFile => {}
-            FileFormat::CustomBinaryFile => {}
-            FileFormat::Undefined => {}
-        }
+        let image = self.construct_data_from_file().unwrap();
+        image.save(&self.to).unwrap();
         Ok(())
     }
 
@@ -125,33 +99,78 @@ impl ImageConverter {
         format
     }
 
-    fn construct_data_from_file(&self, file: &str) -> Vec<u32> {
-        let from_file = File::open(file).expect("Failed to open from file");
-        let from_buf = BufReader::new(from_file);
-        let mut buf = Vec::new();
+    fn construct_data_from_file(&self) -> ImageResult<DynamicImage> {
+        let ret;
 
-        for line in from_buf.lines() {
-            if let Ok(line) = line {
-                let line = line.trim_end();
-                if !line.is_empty() {
-                    let tmp = line
-                        .split(' ')
-                        .map(|x| u8::from_str_radix(x, 16).unwrap())
-                        .collect::<Vec<u8>>();
-                    let iter = tmp.chunks_exact(self.bin_file_format.bits_per_sample as usize);
+        match self.from_format {
+            FileFormat::TextFile => {
+                let from_file = File::open(&self.from).expect("Failed to open from file");
+                let from_buf = BufReader::new(from_file);
+                let mut buf = Vec::new();
 
-                    for pixel in iter {
-                        let mut len = pixel.len();
-                        let mut value = 0 as u32;
-                        while len > 0 {
-                            value = (value << 8) | pixel[len - 1] as u32;
-                            len -= 1;
+                for line in from_buf.lines() {
+                    if let Ok(line) = line {
+                        let line = line.trim_end();
+                        if !line.is_empty() {
+                            let tmp = line
+                                .split(' ')
+                                .map(|x| u8::from_str_radix(x, 16).unwrap())
+                                .collect::<Vec<u8>>();
+                            let iter =
+                                tmp.chunks_exact(self.bin_file_format.bits_per_sample as usize);
+
+                            for pixel in iter {
+                                let mut len = pixel.len();
+                                let mut value = 0 as u32;
+                                while len > 0 {
+                                    value = (value << 8) | pixel[len - 1] as u32;
+                                    len -= 1;
+                                }
+                                buf.push(value);
+                            }
                         }
-                        buf.push(value);
                     }
                 }
+
+                let width = self
+                    .width
+                    .parse::<u32>()
+                    .expect("Need to specify the width of the image!");
+                let height = self
+                    .height
+                    .parse::<u32>()
+                    .expect("Need to specify the height of the image!");
+
+                let mut image = RgbImage::new(width, height);
+                for (i, pixel) in buf.iter().enumerate() {
+                    let r = pixel >> 11;
+                    let g = (pixel >> 5) & 0x3F;
+                    let b = pixel & 0x1F;
+
+                    let r = (r as f32 * 255.0 / 31.0 + 0.5) as u8;
+                    let g = (g as f32 * 255.0 / 63.0 + 0.5) as u8;
+                    let b = (b as f32 * 255.0 / 31.0 + 0.5) as u8;
+                    image.put_pixel(i as u32 % width, i as u32 / width, image::Rgb([r, g, b]));
+                }
+
+                // todo: other formats
+                ret = Ok(DynamicImage::ImageRgb8(image));
+            }
+            FileFormat::RawBinaryFile => {
+                panic!("undefined file format");
+            }
+            FileFormat::StandardBinaryFile => {
+                ret = image::open(&self.from);
+            }
+            _ => {
+                ret = Err(ImageError::Unsupported(
+                    UnsupportedError::from_format_and_kind(
+                        image::error::ImageFormatHint::Unknown,
+                        image::error::UnsupportedErrorKind::GenericFeature("unknown".to_string()),
+                    ),
+                ));
             }
         }
-        buf
+        ret
     }
 }

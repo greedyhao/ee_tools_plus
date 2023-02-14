@@ -152,12 +152,6 @@ fn main() {
             converter.set_width_and_height(width, height);
             converter.set_bin_file_format(format);
             converter.run().unwrap();
-
-            // let file = args.next().unwrap().split('=').next_back().unwrap();
-
-            // let out = file.split('.').next().unwrap();
-            // let out = out.to_owned() + ".png";
-            // println!("w={} h={} file={} out={}", width, height, file, out);
         }
     }
 }
