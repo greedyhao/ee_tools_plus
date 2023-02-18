@@ -21,7 +21,7 @@ mod tests {
         let height = String::from("385");
         
         let mut converter = ImageConverter::new(from, to, true);
-        let format = BinFileFormat { bits_per_sample: 2 };
+        let format = BinFileFormat::new("rgb565".to_string()).expect("format is not supported");
 
         converter.set_width_and_height(width, height);
         converter.set_bin_file_format(format);

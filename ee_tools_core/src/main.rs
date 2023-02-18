@@ -83,17 +83,12 @@ enum Action {
         #[arg(long, default_value_t = String::new())]
         height: String,
 
+        /// RGB type selection. Optional alpha selection. e.g., `--rgb-type "argb332"`
         #[arg(long, default_value_t = String::new())]
         rgb_type: String,
 
         #[arg(long, default_value_t = false)]
-        has_alpha: bool,
-
-        #[arg(long, default_value_t = false)]
         has_custom_format: bool,
-
-        #[arg(long, default_value_t = 0)]
-        bits_per_sample: u8,
     },
 }
 
@@ -141,13 +136,11 @@ fn main() {
             to,
             width,
             height,
-            rgb_type: _,
-            has_alpha: _,
+            rgb_type,
             has_custom_format,
-            bits_per_sample,
         } => {
             let mut converter = ImageConverter::new(from, to, has_custom_format);
-            let format = BinFileFormat { bits_per_sample };
+            let format = BinFileFormat::new(rgb_type).expect("format is not supported");
 
             converter.set_width_and_height(width, height);
             converter.set_bin_file_format(format);
