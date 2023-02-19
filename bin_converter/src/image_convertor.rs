@@ -23,7 +23,6 @@ enum ColorFormat {
     Rgb332,
     Rgb565,
     Rgb888,
-
     // ARgb332,
     // ARgb565,
     // ARgb888,
@@ -98,8 +97,8 @@ pub struct ImageConverter {
     bin_file_format: BinFileFormat,
     from_format: FileFormat,
     to_format: FileFormat,
-    width: String,
-    height: String,
+    width: u32,
+    height: u32,
 }
 
 type PixelToRgb = fn(u32) -> [u8; 3];
@@ -112,8 +111,8 @@ impl ImageConverter {
             bin_file_format: BinFileFormat::default(),
             from_format: FileFormat::Undefined,
             to_format: FileFormat::Undefined,
-            width: String::new(),
-            height: String::new(),
+            width: 0,
+            height: 0,
         }
     }
 
@@ -122,8 +121,18 @@ impl ImageConverter {
     }
 
     pub fn set_width_and_height(&mut self, width: String, height: String) {
-        self.width = width;
-        self.height = height;
+        self.width = match width.parse::<u32>() {
+            Ok(width) => width,
+            Err(_) => 0,
+        };
+        self.height = match height.parse::<u32>() {
+            Ok(height) => height,
+            Err(_) => 0,
+        };
+
+        if self.width == 0 || self.height == 0 {
+            panic!("width or height is invalid");
+        }
     }
 
     pub fn run(&mut self) -> Result<(), String> {
@@ -209,16 +218,7 @@ impl ImageConverter {
                     }
                 }
 
-                let width = self
-                    .width
-                    .parse::<u32>()
-                    .expect("Need to specify the width of the image!");
-                let height = self
-                    .height
-                    .parse::<u32>()
-                    .expect("Need to specify the height of the image!");
-
-                let image = self.image_from_vec(width, height, buf);
+                let image = self.image_from_vec(self.width, self.height, buf);
                 ret = Ok(DynamicImage::ImageRgb8(image));
             }
             FileFormat::RawBinaryFile => {
